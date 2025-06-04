@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Atrasos de Veículos</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        .tab-button.active {
+            @apply bg-blue-600 text-white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <div class="container mx-auto p-4 flex-grow">
+        <h1 class="text-4xl font-bold text-center text-gray-800 mb-8 mt-4">Controle de Atrasos de Veículos</h1>
+
+        <!-- Loading Indicator -->
+        <div id="loading-indicator" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 hidden">
+            <div class="flex flex-col items-center">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+                <p class="text-white text-lg mt-4">Carregando...</p>
+            </div>
+        </div>
+
+        <!-- User ID Display -->
+        <div class="text-center text-sm text-gray-600 mb-4">
+            Seu ID de Usuário: <span id="user-id-display" class="font-semibold">Carregando...</span>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="flex justify-center mb-8 bg-white p-2 rounded-lg shadow-md">
+            <button class="tab-button px-6 py-3 rounded-lg text-lg font-medium text-gray-700 hover:bg-blue-500 hover:text-white transition-colors duration-200 mr-2 active" data-tab="control">
+                <i class="fas fa-clock mr-2"></i>Controle de Atrasos
+            </button>
+            <button class="tab-button px-6 py-3 rounded-lg text-lg font-medium text-gray-700 hover:bg-blue-500 hover:text-white transition-colors duration-200 mr-2" data-tab="dashboard">
+                <i class="fas fa-chart-line mr-2"></i>Dashboard
+            </button>
+            <button class="tab-button px-6 py-3 rounded-lg text-lg font-medium text-gray-700 hover:bg-blue-500 hover:text-white transition-colors duration-200" data-tab="settings">
+                <i class="fas fa-cogs mr-2"></i>Configurações
+            </button>
+        </div>
+
+        <!-- Tab Content: Control -->
+        <div id="control" class="tab-content active bg-white p-8 rounded-lg shadow-xl mb-8">
+            <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Gerenciar Atrasos</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                    <label for="car-plate-input" class="block text-gray-700 text-sm font-bold mb-2">Placa do Carro:</label>
+                    <input type="text" id="car-plate-input" placeholder="Ex: ABC1234" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="driver-id-input" class="block text-gray-700 text-sm font-bold mb-2">Matrícula do Motorista:</label>
+                    <input type="text" id="driver-id-input" placeholder="Ex: MTR001" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="management-name-input" class="block text-gray-700 text-sm font-bold mb-2">Gerência:</label>
+                    <input type="text" id="management-name-input" placeholder="Ex: Logística" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="operation-type-select" class="block text-gray-700 text-sm font-bold mb-2">Tipo de Operação:</label>
+                    <select id="operation-type-select" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Entrega">Entrega</option>
+                        <option value="Recebimento">Recebimento</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <button id="start-delay-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105">
+                    <i class="fas fa-play-circle mr-2"></i>Iniciar Atraso
+                </button>
+                <button id="toggle-pause-resume-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105" disabled>
+                    <i class="fas fa-pause-circle mr-2"></i>Pausar / <i class="fas fa-play-circle mr-2"></i>Continuar
+                </button>
+                <button id="end-delay-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105" disabled>
+                    <i class="fas fa-stop-circle mr-2"></i>Finalizar Atraso
+                </button>
+            </div>
+
+            <!-- Message Box for user feedback -->
+            <div id="message-box" class="mt-8 p-4 rounded-lg text-center font-medium hidden"></div>
+
+        </div>
+
+        <!-- Tab Content: Dashboard -->
+        <div id="dashboard" class="tab-content bg-white p-8 rounded-lg shadow-xl mb-8">
+            <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Dashboard de Atrasos</h2>
+
+            <!-- Date Filter and PDF Button -->
+            <div class="flex flex-col md:flex-row items-center justify-center gap-4 mb-8 p-4 bg-gray-50 rounded-lg shadow-sm">
+                <div>
+                    <label for="start-date-input" class="block text-gray-700 text-sm font-bold mb-1">Data de Início:</label>
+                    <input type="date" id="start-date-input" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="end-date-input" class="block text-gray-700 text-sm font-bold mb-1">Data de Fim:</label>
+                    <input type="date" id="end-date-input" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button id="generate-pdf-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105 md:mt-6">
+                    <i class="fas fa-file-pdf mr-2"></i>Gerar Relatório PDF
+                </button>
+            </div>
+
+            <div class="mb-8">
+                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Atrasos Ativos</h3>
+                <div id="active-delays-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <p class="text-gray-500 text-center col-span-full">Nenhum atraso ativo no momento.</p>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Atrasos Finalizados</h3>
+                <div class="overflow-x-auto rounded-lg shadow">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                                <th class="py-3 px-6 text-left">Placa</th>
+                                <th class="py-3 px-6 text-left">Motorista</th>
+                                <th class="py-3 px-6 text-left">Gerência</th>
+                                <th class="py-3 px-6 text-left">Operação</th>
+                                <th class="py-3 px-6 text-left">Início</th>
+                                <th class="py-3 px-6 text-left">Fim</th>
+                                <th class="py-3 px-6 text-left">Duração Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="completed-delays-table-body" class="text-gray-700 text-sm font-light">
+                            <tr><td colspan="7" class="py-4 px-6 text-center text-gray-500">Nenhum atraso finalizado.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Settings -->
+        <div id="settings" class="tab-content bg-white p-8 rounded-lg shadow-xl mb-8">
+            <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Configurações</h2>
+
+            <!-- Add Car Form -->
+            <div class="mb-10 p-6 border border-gray-200 rounded-lg shadow-sm">
+                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Cadastrar Carro</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="settings-car-plate" class="block text-gray-700 text-sm font-bold mb-2">Placa:</label>
+                        <input type="text" id="settings-car-plate" placeholder="Ex: ABC1234" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="settings-car-model" class="block text-gray-700 text-sm font-bold mb-2">Modelo (Opcional):</label>
+                        <input type="text" id="settings-car-model" placeholder="Ex: Fiat Uno" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <button id="add-car-btn" class="mt-6 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105">
+                    <i class="fas fa-plus-circle mr-2"></i>Adicionar Carro
+                </button>
+            </div>
+
+            <!-- Car List -->
+            <div class="mb-10">
+                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Carros Cadastrados</h3>
+                <div class="overflow-x-auto rounded-lg shadow">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                                <th class="py-3 px-6 text-left">Placa</th>
+                                <th class="py-3 px-6 text-left">Modelo</th>
+                                <th class="py-3 px-6 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cars-list-body" class="text-gray-700 text-sm font-light">
+                            <tr><td colspan="3" class="py-4 px-6 text-center text-gray-500">Nenhum carro cadastrado.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add Driver Form -->
+            <div class="mb-10 p-6 border border-gray-200 rounded-lg shadow-sm">
+                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Cadastrar Motorista</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="settings-driver-id" class="block text-gray-700 text-sm font-bold mb-2">Matrícula:</label>
+                        <input type="text" id="settings-driver-id" placeholder="Ex: MTR001" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="settings-driver-name" class="block text-gray-700 text-sm font-bold mb-2">Nome:</label>
+                        <input type="text" id="settings-driver-name" placeholder="Ex: João Silva" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <button id="add-driver-btn" class="mt-6 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105">
+                    <i class="fas fa-plus-circle mr-2"></i>Adicionar Motorista
+                </button>
+            </div>
+
+            <!-- Driver List -->
+            <div class="mb-10">
+                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Motoristas Cadastrados</h3>
+                <div class="overflow-x-auto rounded-lg shadow">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                                <th class="py-3 px-6 text-left">Matrícula</th>
+                                <th class="py-3 px-6 text-left">Nome</th>
+                                <th class="py-3 px-6 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drivers-list-body" class="text-gray-700 text-sm font-light">
+                            <tr><td colspan="3" class="py-4 px-6 text-center text-gray-500">Nenhum motorista cadastrado.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add Management Form -->
+            <div class="mb-10 p-6 border border-gray-200 rounded-lg shadow-sm">
+                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Cadastrar Gerência</h3>
+                <div>
+                    <label for="settings-management-name" class="block text-gray-700 text-sm font-bold mb-2">Nome da Gerência:</label>
+                    <input type="text" id="settings-management-name" placeholder="Ex: Vendas" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button id="add-management-btn" class="mt-6 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105">
+                    <i class="fas fa-plus-circle mr-2"></i>Adicionar Gerência
+                </button>
+            </div>
+
+            <!-- Management List -->
+            <div>
+                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Gerências Cadastradas</h3>
+                <div class="overflow-x-auto rounded-lg shadow">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                                <th class="py-3 px-6 text-left">Nome</th>
+                                <th class="py-3 px-6 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="managements-list-body" class="text-gray-700 text-sm font-light">
+                            <tr><td colspan="2" class="py-4 px-6 text-center text-gray-500">Nenhuma gerência cadastrada.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- jsPDF CDN (loaded as a global script) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Firebase SDKs and main application logic -->
+    <script type="module" src="./script.js"></script>
+</body>
+</html>
