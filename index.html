@@ -1,281 +1,1618 @@
+html
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="h-full bg-slate-50">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle de Atrasos de Veículos</title>
+    <title>Preserves Equipe - Painel de Controle</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- FontAwesome para Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF para Geração de Relatórios PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        preserves: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Light gray background */
-        }
-        .tab-button.active {
-            @apply bg-blue-600 text-white;
-        }
         .tab-content {
             display: none;
+            opacity: 0;
+            transition: opacity 0.15s ease-in-out;
         }
         .tab-content.active {
             display: block;
-        }
-        /* Custom scrollbar for better aesthetics */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #555;
+            opacity: 1;
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
-    <div class="container mx-auto p-4 flex-grow">
-        <h1 class="text-4xl font-bold text-center text-gray-800 mb-8 mt-4">Controle de Atrasos de Veículos</h1>
+<body class="h-full flex flex-col text-slate-800">
 
-        <!-- Loading Indicator -->
-        <div id="loading-indicator" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 hidden">
-            <div class="flex flex-col items-center">
-                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
-                <p class="text-white text-lg mt-4">Carregando...</p>
-            </div>
+    <!-- NOTIFICAÇÃO TOAST CUSTOMIZADA (Evita uso de alert) -->
+    <div id="toast" class="fixed top-5 right-5 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-500 bg-white rounded-lg shadow-xl border-l-4 border-preserves-600 transition-all duration-300 transform translate-y-[-150%] opacity-0">
+        <div class="text-preserves-600" id="toast-icon">
+            <i class="fas fa-check-circle text-lg"></i>
         </div>
+        <div class="text-sm font-semibold text-slate-700" id="toast-message">Mensagem!</div>
+    </div>
 
-        <!-- User ID Display -->
-        <div class="text-center text-sm text-gray-600 mb-4">
-            Seu ID de Usuário: <span id="user-id-display" class="font-semibold">Carregando...</span>
-        </div>
-
-        <!-- Tab Navigation -->
-        <div class="flex justify-center mb-8 bg-white p-2 rounded-lg shadow-md">
-            <button class="tab-button px-6 py-3 rounded-lg text-lg font-medium text-gray-700 hover:bg-blue-500 hover:text-white transition-colors duration-200 mr-2 active" data-tab="control">
-                <i class="fas fa-clock mr-2"></i>Controle de Atrasos
-            </button>
-            <button class="tab-button px-6 py-3 rounded-lg text-lg font-medium text-gray-700 hover:bg-blue-500 hover:text-white transition-colors duration-200 mr-2" data-tab="dashboard">
-                <i class="fas fa-chart-line mr-2"></i>Dashboard
-            </button>
-            <button class="tab-button px-6 py-3 rounded-lg text-lg font-medium text-gray-700 hover:bg-blue-500 hover:text-white transition-colors duration-200" data-tab="settings">
-                <i class="fas fa-cogs mr-2"></i>Configurações
-            </button>
-        </div>
-
-        <!-- Tab Content: Control -->
-        <div id="control" class="tab-content active bg-white p-8 rounded-lg shadow-xl mb-8">
-            <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Gerenciar Atrasos</h2>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- MODAL DE EDIÇÃO DE COLABORADOR -->
+    <div id="modal-edit-colab" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-user-edit text-preserves-600"></i> Editar Colaborador
+            </h3>
+            <input type="hidden" id="edit-colab-id">
+            <div class="space-y-4">
                 <div>
-                    <label for="car-plate-input" class="block text-gray-700 text-sm font-bold mb-2">Placa do Carro:</label>
-                    <input type="text" id="car-plate-input" placeholder="Ex: ABC1234" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Nome Completo</label>
+                    <input type="text" id="edit-colab-nome" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
                 </div>
                 <div>
-                    <label for="driver-id-input" class="block text-gray-700 text-sm font-bold mb-2">Matrícula do Motorista:</label>
-                    <input type="text" id="driver-id-input" placeholder="Ex: MTR001" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label for="management-name-input" class="block text-gray-700 text-sm font-bold mb-2">Gerência:</label>
-                    <input type="text" id="management-name-input" placeholder="Ex: Logística" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label for="operation-type-select" class="block text-gray-700 text-sm font-bold mb-2">Tipo de Operação:</label>
-                    <select id="operation-type-select" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="Entrega">Entrega</option>
-                        <option value="Recebimento">Recebimento</option>
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Cargo</label>
+                    <select id="edit-colab-funcao" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                        <option value="Encarregado">Encarregado</option>
+                        <option value="Ajudante">Ajudante</option>
                     </select>
                 </div>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <button id="start-delay-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105">
-                    <i class="fas fa-play-circle mr-2"></i>Iniciar Atraso
-                </button>
-                <button id="toggle-pause-resume-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105" disabled>
-                    <i class="fas fa-pause-circle mr-2"></i>Pausar / <i class="fas fa-play-circle mr-2"></i>Continuar
-                </button>
-                <button id="end-delay-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105" disabled>
-                    <i class="fas fa-stop-circle mr-2"></i>Finalizar Atraso
-                </button>
-            </div>
-
-            <!-- Message Box for user feedback -->
-            <div id="message-box" class="mt-8 p-4 rounded-lg text-center font-medium hidden"></div>
-
-        </div>
-
-        <!-- Tab Content: Dashboard -->
-        <div id="dashboard" class="tab-content bg-white p-8 rounded-lg shadow-xl mb-8">
-            <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Dashboard de Atrasos</h2>
-
-            <!-- Date Filter and PDF Button -->
-            <div class="flex flex-col md:flex-row items-center justify-center gap-4 mb-8 p-4 bg-gray-50 rounded-lg shadow-sm">
-                <div>
-                    <label for="start-date-input" class="block text-gray-700 text-sm font-bold mb-1">Data de Início:</label>
-                    <input type="date" id="start-date-input" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label for="end-date-input" class="block text-gray-700 text-sm font-bold mb-1">Data de Fim:</label>
-                    <input type="date" id="end-date-input" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <button id="generate-pdf-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105 md:mt-6">
-                    <i class="fas fa-file-pdf mr-2"></i>Gerar Relatório PDF
-                </button>
-            </div>
-
-            <div class="mb-8">
-                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Atrasos Ativos</h3>
-                <div id="active-delays-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <p class="text-gray-500 text-center col-span-full">Nenhum atraso ativo no momento.</p>
-                </div>
-            </div>
-
-            <div>
-                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Atrasos Finalizados</h3>
-                <div class="overflow-x-auto rounded-lg shadow">
-                    <table class="min-w-full bg-white">
-                        <thead>
-                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                                <th class="py-3 px-6 text-left">Placa</th>
-                                <th class="py-3 px-6 text-left">Motorista</th>
-                                <th class="py-3 px-6 text-left">Gerência</th>
-                                <th class="py-3 px-6 text-left">Operação</th>
-                                <th class="py-3 px-6 text-left">Início</th>
-                                <th class="py-3 px-6 text-left">Fim</th>
-                                <th class="py-3 px-6 text-left">Duração Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="completed-delays-table-body" class="text-gray-700 text-sm font-light">
-                            <tr><td colspan="7" class="py-4 px-6 text-center text-gray-500">Nenhum atraso finalizado.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab Content: Settings -->
-        <div id="settings" class="tab-content bg-white p-8 rounded-lg shadow-xl mb-8">
-            <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Configurações</h2>
-
-            <!-- Add Car Form -->
-            <div class="mb-10 p-6 border border-gray-200 rounded-lg shadow-sm">
-                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Cadastrar Carro</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="settings-car-plate" class="block text-gray-700 text-sm font-bold mb-2">Placa:</label>
-                        <input type="text" id="settings-car-plate" placeholder="Ex: ABC1234" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label for="settings-car-model" class="block text-gray-700 text-sm font-bold mb-2">Modelo (Opcional):</label>
-                        <input type="text" id="settings-car-model" placeholder="Ex: Fiat Uno" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                </div>
-                <button id="add-car-btn" class="mt-6 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105">
-                    <i class="fas fa-plus-circle mr-2"></i>Adicionar Carro
-                </button>
-            </div>
-
-            <!-- Car List -->
-            <div class="mb-10">
-                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Carros Cadastrados</h3>
-                <div class="overflow-x-auto rounded-lg shadow">
-                    <table class="min-w-full bg-white">
-                        <thead>
-                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                                <th class="py-3 px-6 text-left">Placa</th>
-                                <th class="py-3 px-6 text-left">Modelo</th>
-                                <th class="py-3 px-6 text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cars-list-body" class="text-gray-700 text-sm font-light">
-                            <tr><td colspan="3" class="py-4 px-6 text-center text-gray-500">Nenhum carro cadastrado.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Add Driver Form -->
-            <div class="mb-10 p-6 border border-gray-200 rounded-lg shadow-sm">
-                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Cadastrar Motorista</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="settings-driver-id" class="block text-gray-700 text-sm font-bold mb-2">Matrícula:</label>
-                        <input type="text" id="settings-driver-id" placeholder="Ex: MTR001" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label for="settings-driver-name" class="block text-gray-700 text-sm font-bold mb-2">Nome:</label>
-                        <input type="text" id="settings-driver-name" placeholder="Ex: João Silva" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                </div>
-                <button id="add-driver-btn" class="mt-6 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105">
-                    <i class="fas fa-plus-circle mr-2"></i>Adicionar Motorista
-                </button>
-            </div>
-
-            <!-- Driver List -->
-            <div class="mb-10">
-                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Motoristas Cadastrados</h3>
-                <div class="overflow-x-auto rounded-lg shadow">
-                    <table class="min-w-full bg-white">
-                        <thead>
-                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                                <th class="py-3 px-6 text-left">Matrícula</th>
-                                <th class="py-3 px-6 text-left">Nome</th>
-                                <th class="py-3 px-6 text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="drivers-list-body" class="text-gray-700 text-sm font-light">
-                            <tr><td colspan="3" class="py-4 px-6 text-center text-gray-500">Nenhum motorista cadastrado.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Add Management Form -->
-            <div class="mb-10 p-6 border border-gray-200 rounded-lg shadow-sm">
-                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Cadastrar Gerência</h3>
-                <div>
-                    <label for="settings-management-name" class="block text-gray-700 text-sm font-bold mb-2">Nome da Gerência:</label>
-                    <input type="text" id="settings-management-name" placeholder="Ex: Vendas" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <button id="add-management-btn" class="mt-6 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105">
-                    <i class="fas fa-plus-circle mr-2"></i>Adicionar Gerência
-                </button>
-            </div>
-
-            <!-- Management List -->
-            <div>
-                <h3 class="text-2xl font-semibold text-gray-700 mb-4">Gerências Cadastradas</h3>
-                <div class="overflow-x-auto rounded-lg shadow">
-                    <table class="min-w-full bg-white">
-                        <thead>
-                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                                <th class="py-3 px-6 text-left">Nome</th>
-                                <th class="py-3 px-6 text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="managements-list-body" class="text-gray-700 text-sm font-light">
-                            <tr><td colspan="2" class="py-4 px-6 text-center text-gray-500">Nenhuma gerência cadastrada.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button onclick="fecharModalColab()" class="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Cancelar</button>
+                <button onclick="salvarEdicaoColaborador()" class="px-4 py-2 text-sm font-semibold text-white bg-preserves-700 hover:bg-preserves-800 rounded-lg shadow transition-colors">Salvar Alterações</button>
             </div>
         </div>
     </div>
 
-    <!-- jsPDF CDN (loaded as a global script) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- MODAL DE EDIÇÃO DE CARRO (HILUX) -->
+    <div id="modal-edit-veiculo" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-edit text-preserves-600"></i> Editar Cadastro da Hilux
+            </h3>
+            <input type="hidden" id="edit-veiculo-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Modelo / Identificação</label>
+                    <input type="text" id="edit-veiculo-nome" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Placa</label>
+                    <input type="text" id="edit-veiculo-placa" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Encarregado Atribuído</label>
+                    <select id="edit-veiculo-encarregado" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                        <!-- Carregado via JS -->
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button onclick="fecharModalVeiculo()" class="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Cancelar</button>
+                <button onclick="salvarEdicaoVeiculo()" class="px-4 py-2 text-sm font-semibold text-white bg-preserves-700 hover:bg-preserves-800 rounded-lg shadow transition-colors">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- Firebase SDKs and main application logic -->
-    <script type="module" src="./script.js"></script>
+    <!-- MODAL DE EDIÇÃO DE MANUTENÇÃO -->
+    <div id="modal-edit-manutencao" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-tools text-amber-600"></i> Editar Registro de Manutenção
+            </h3>
+            <input type="hidden" id="edit-manut-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Veículo em Manutenção</label>
+                    <select id="edit-manut-veiculo" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                        <!-- Carregado via JS -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Motivo / Descrição</label>
+                    <input type="text" id="edit-manut-motivo" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Data de Saída (Oficina)</label>
+                        <input type="date" id="edit-manut-saida" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Previsão Retorno</label>
+                        <input type="date" id="edit-manut-retorno" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Status</label>
+                    <select id="edit-manut-status" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                        <option value="Em Manutenção">Em Manutenção</option>
+                        <option value="Concluído">Concluído / Operacional</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button onclick="fecharModalManutencao()" class="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Cancelar</button>
+                <button onclick="salvarEdicaoManutencao()" class="px-4 py-2 text-sm font-semibold text-white bg-preserves-700 hover:bg-preserves-800 rounded-lg shadow transition-colors">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOPO / HEADER -->
+    <header class="bg-preserves-900 text-white shadow-md shrink-0">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col lg:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-preserves-700 rounded-xl">
+                    <i class="fas fa-users-cog text-xl md:text-2xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black tracking-tight">PRESERVES EQUIPE</h1>
+                    <p class="text-xs text-preserves-200">Painel Operacional Avançado e Controle de Frota</p>
+                </div>
+            </div>
+            
+            <!-- ABAS DE NAVEGAÇÃO -->
+            <nav class="flex bg-preserves-800/60 p-1.5 rounded-xl border border-preserves-700/50 overflow-x-auto w-full lg:w-auto">
+                <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-preserves-700 text-white transition-all whitespace-nowrap">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Dashboard Equipes</span>
+                </button>
+                <button onclick="switchTab('colaboradores')" id="btn-colaboradores" class="nav-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-preserves-200 hover:text-white transition-all whitespace-nowrap">
+                    <i class="fas fa-users"></i>
+                    <span>Colaboradores</span>
+                </button>
+                <button onclick="switchTab('veiculos')" id="btn-veiculos" class="nav-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-preserves-200 hover:text-white transition-all whitespace-nowrap">
+                    <i class="fas fa-car-side"></i>
+                    <span>Cadastro de Hilux</span>
+                </button>
+                <button onclick="switchTab('manutencao')" id="btn-manutencao" class="nav-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-preserves-200 hover:text-white transition-all whitespace-nowrap">
+                    <i class="fas fa-tools"></i>
+                    <span>Aba Manutenção</span>
+                </button>
+                <button onclick="switchTab('rodizio')" id="btn-rodizio" class="nav-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-preserves-200 hover:text-white transition-all whitespace-nowrap">
+                    <i class="fas fa-sync"></i>
+                    <span>Girar Rodízio</span>
+                </button>
+                <button onclick="switchTab('relatorios')" id="btn-relatorios" class="nav-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-preserves-200 hover:text-white transition-all whitespace-nowrap">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>Gerar PDFs</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 overflow-y-auto">
+
+        <!-- ================= ABAS: DASHBOARD ================= -->
+        <div id="tab-dashboard" class="tab-content active space-y-6">
+            <div class="border-b border-slate-200 pb-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Dashboard Operacional de Equipes</h2>
+                    <p class="text-sm text-slate-500">Métricas e visualização completa das frentes de serviço ativas com seus respectivos veículos.</p>
+                </div>
+                <div class="bg-preserves-100 text-preserves-800 px-4 py-2 rounded-xl text-xs font-bold border border-preserves-200 self-start sm:self-auto flex items-center gap-2">
+                    <span class="w-2 h-2 bg-preserves-600 rounded-full animate-ping"></span>
+                    <span>Modo Simulação: Dados de Teste Ativos</span>
+                </div>
+            </div>
+
+            <!-- CARDS DE METRICAS RÁPIDAS -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Líderes (Encarregados)</span>
+                        <h3 id="dash-tot-encarregados" class="text-3xl font-black text-slate-800 mt-1">0</h3>
+                    </div>
+                    <div class="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-user-tie text-lg"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Ajudantes Ativos</span>
+                        <h3 id="dash-tot-ajudantes" class="text-3xl font-black text-slate-800 mt-1">0</h3>
+                    </div>
+                    <div class="w-11 h-11 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-user-friends text-lg"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Hilux Operacionais</span>
+                        <h3 id="dash-tot-veiculos" class="text-3xl font-black text-slate-800 mt-1">0</h3>
+                    </div>
+                    <div class="w-11 h-11 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-truck-pickup text-lg"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Hilux em Manutenção</span>
+                        <h3 id="dash-tot-manutencao" class="text-3xl font-black text-rose-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-11 h-11 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-tools text-lg"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DETALHE VISUAL DAS EQUIPES ATIVAS (DASHBOARD DAS EQUIPES) -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-150 pb-2">
+                    <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        <i class="fas fa-hard-hat text-preserves-600"></i> Painel de Equipes de Campo (Primeiro Período do Mês)
+                    </h3>
+                    <span class="text-xs text-slate-400 font-semibold">Atualização automática via escala</span>
+                </div>
+
+                <div id="dashboard-equipes-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Inserido dinamicamente via Javascript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= ABAS: COLABORADORES ================= -->
+        <div id="tab-colaboradores" class="tab-content space-y-6">
+            <div class="border-b border-slate-200 pb-4">
+                <h2 class="text-2xl font-bold text-slate-800">Painel de Colaboradores</h2>
+                <p class="text-sm text-slate-500">Cadastre encarregados e ajudantes. Os dados são salvos em Cookies automaticamente.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Formulário de Cadastro -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit">
+                    <h3 class="font-bold text-slate-800 text-lg border-b border-slate-100 pb-3 mb-4">Adicionar Integrante</h3>
+                    <form id="form-colaborador" onsubmit="salvarColaborador(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Nome Completo</label>
+                            <input type="text" id="colab-nome" required placeholder="Ex: Rogério Ceni" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Cargo / Função</label>
+                            <select id="colab-funcao" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                                <option value="Encarregado">Encarregado</option>
+                                <option value="Ajudante">Ajudante</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-preserves-700 text-white p-3 rounded-lg font-bold hover:bg-preserves-800 transition-colors shadow-sm flex items-center justify-center space-x-2">
+                            <i class="fas fa-plus"></i>
+                            <span>Cadastrar Funcionário</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Tabela de Lista -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2">
+                    <h3 class="font-bold text-slate-800 text-lg border-b border-slate-100 pb-3 mb-4">Colaboradores no Sistema</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-xs font-bold uppercase text-slate-400 bg-slate-50/50">
+                                    <th class="p-4">Nome</th>
+                                    <th class="p-4">Cargo</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-colaboradores" class="divide-y divide-slate-100">
+                                <!-- Gerado por JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= ABAS: CADASTRO DE CARROS ================= -->
+        <div id="tab-veiculos" class="tab-content space-y-6">
+            <div class="border-b border-slate-200 pb-4">
+                <h2 class="text-2xl font-bold text-slate-800">Gestão de Veículos Operacionais</h2>
+                <p class="text-sm text-slate-500">Cadastre e vincule veículos Hilux com seus encarregados permanentes.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Cadastro de Carro (Hilux) -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit">
+                    <h3 class="font-bold text-slate-800 text-lg border-b border-slate-100 pb-3 mb-4">Registrar Nova Hilux</h3>
+                    <form id="form-veiculo" onsubmit="salvarVeiculo(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Modelo / Identificação do Carro</label>
+                            <input type="text" id="veiculo-nome" required placeholder="Ex: Hilux CD 4x4 Prata" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Placa</label>
+                            <input type="text" id="veiculo-placa" required placeholder="Ex: BRA2E19" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Encarregado Responsável</label>
+                            <select id="veiculo-encarregado" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                                <!-- Preenchido dinamicamente com Encarregados -->
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-preserves-700 text-white p-3 rounded-lg font-bold hover:bg-preserves-800 transition-colors shadow-sm flex items-center justify-center space-x-2">
+                            <i class="fas fa-truck-pickup"></i>
+                            <span>Salvar Registro de Carro</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Lista de Carros -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2">
+                    <h3 class="font-bold text-slate-800 text-lg border-b border-slate-100 pb-3 mb-4">Frota de Hilux Operacionais</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-xs font-bold uppercase text-slate-400 bg-slate-50/50">
+                                    <th class="p-4">Identificação</th>
+                                    <th class="p-4">Placa</th>
+                                    <th class="p-4">Líder / Encarregado</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-veiculos" class="divide-y divide-slate-100">
+                                <!-- Gerado por JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= ABAS: ABA MANUTENÇÃO (SEPARADA) ================= -->
+        <div id="tab-manutencao" class="tab-content space-y-6">
+            <div class="border-b border-slate-200 pb-4">
+                <h2 class="text-2xl font-bold text-slate-800">Controle de Veículos em Manutenção</h2>
+                <p class="text-sm text-slate-500">Controle isolado de veículos afastados para reparos mecânicos ou revisões.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Cadastro de Manutenção -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit">
+                    <h3 class="font-bold text-slate-800 text-lg border-b border-slate-100 pb-3 mb-4">Registrar Entrada de Carro</h3>
+                    <form id="form-manutencao" onsubmit="salvarManutencao(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Selecionar Veículo (Hilux)</label>
+                            <select id="manut-veiculo" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                                <!-- Preenchido dinamicamente via JS com Veículos -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Motivo da Manutenção</label>
+                            <input type="text" id="manut-motivo" required placeholder="Ex: Revisão preventiva ou Troca de freios" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-600 mb-1">Data de Saída</label>
+                                <input type="date" id="manut-saida" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-600 mb-1">Previsão Retorno</label>
+                                <input type="date" id="manut-retorno" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-amber-600 text-white p-3 rounded-lg font-bold hover:bg-amber-700 transition-colors shadow-sm flex items-center justify-center space-x-2">
+                            <i class="fas fa-tools"></i>
+                            <span>Enviar para Manutenção</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Lista de Carros em Manutenção -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2">
+                    <h3 class="font-bold text-slate-800 text-lg border-b border-slate-100 pb-3 mb-4">Frotas Afastadas para Reparo / Revisão</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-xs font-bold uppercase text-slate-400 bg-slate-50/50">
+                                    <th class="p-4">Carro / Placa</th>
+                                    <th class="p-4">Problema / Motivo</th>
+                                    <th class="p-4">Datas (Saída / Retorno)</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-manutencao" class="divide-y divide-slate-100">
+                                <!-- Gerado por JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= ABAS: RODÍZIO ================= -->
+        <div id="tab-rodizio" class="tab-content space-y-6">
+            <div class="border-b border-slate-200 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Rodízio Mensal de Ajudantes</h2>
+                    <p class="text-sm text-slate-500">Defina o número de ajudantes por equipe e gere a rotação circular automática de 3 em 3 dias.</p>
+                </div>
+                <button onclick="gerarRodizio()" class="bg-preserves-700 hover:bg-preserves-800 text-white px-5 py-3 rounded-xl font-bold shadow transition-colors flex items-center space-x-2 text-sm">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Gerar Novo Rodízio Comercial</span>
+                </button>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg border-b border-slate-100 pb-3 mb-4">Configuração das Equipes</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Ajudantes por Equipe</label>
+                        <select id="rodizio-num-ajudantes" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-preserves-500 focus:bg-white text-sm">
+                            <option value="2">2 Ajudantes</option>
+                            <option value="3" selected>3 Ajudantes</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Frequência da Troca</label>
+                        <div class="p-3 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg text-sm font-semibold">
+                            Fixo: a cada 3 dias ocorrem trocas automáticas
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Escala Gerada -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg border-b border-slate-100 pb-3 mb-4 font-mono">Cronograma Detalhado (30 Dias)</h3>
+                <div id="cronograma-container" class="space-y-6">
+                    <!-- Gerado dinamicamente -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= ABAS: GERAR RELATÓRIOS PDF ================= -->
+        <div id="tab-relatorios" class="tab-content space-y-6">
+            <div class="border-b border-slate-200 pb-4">
+                <h2 class="text-2xl font-bold text-slate-800">Exportar Relatórios Oficiais (Separados)</h2>
+                <p class="text-sm text-slate-500">Gere documentos PDF independentes e profissionais para a sua operação de campo ou de frotas.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                
+                <!-- CARD RELATORIO EQUIPES -->
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center flex flex-col justify-between space-y-6">
+                    <div>
+                        <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                            <i class="fas fa-users-cog text-3xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800 mt-4">Escala de Equipes e Rodízios</h3>
+                        <p class="text-sm text-slate-500 mt-2">Gera um relatório do cronograma de trabalho completo. Mostra cada Encarregado, a Hilux atribuída a ele e a escala completa de ajudantes rotativos a cada 3 dias para o mês inteiro.</p>
+                    </div>
+                    <button onclick="gerarPdfEquipesComVeiculos()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white p-3.5 rounded-xl font-bold transition-all shadow-md flex items-center justify-center space-x-2 text-sm">
+                        <i class="fas fa-download"></i>
+                        <span>Baixar PDF de Equipes</span>
+                    </button>
+                </div>
+
+                <!-- CARD RELATORIO MANUTENCAO -->
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center flex flex-col justify-between space-y-6">
+                    <div>
+                        <div class="w-16 h-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                            <i class="fas fa-tools text-3xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800 mt-4">Controle de Frota e Manutenções</h3>
+                        <p class="text-sm text-slate-500 mt-2">Gera um relatório do histórico de manutenções das Hilux. Contém informações detalhadas das entradas em oficina, motivos mecânicos ocorridos, previsões de saída e status operantes.</p>
+                    </div>
+                    <button onclick="gerarPdfManutencoes()" class="w-full bg-rose-600 hover:bg-rose-700 text-white p-3.5 rounded-xl font-bold transition-all shadow-md flex items-center justify-center space-x-2 text-sm">
+                        <i class="fas fa-download"></i>
+                        <span>Baixar PDF de Manutenções</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-100 border-t border-slate-200 py-4 shrink-0 text-center">
+        <div class="max-w-7xl mx-auto px-4 text-xs text-slate-500">
+            <span>&copy; 2026 Preserves Equipe. Informações estruturadas e guardadas via Cookies locais.</span>
+        </div>
+    </footer>
+
+    <!-- LOGICA DO SISTEMA OPERACIONAL -->
+    <script>
+        // --- FUNÇÕES DE COOKIES ---
+        function setCookie(name, value, days = 365) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + date.toUTCString();
+            document.cookie = name + "=" + encodeURIComponent(JSON.stringify(value)) + ";" + expires + ";path=/";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) {
+                    try {
+                        return JSON.parse(decodeURIComponent(c.substring(nameEQ.length, c.length)));
+                    } catch (e) {
+                        return null;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // --- SISTEMA DE SIMULAÇÃO (POPULANDO DADOS SE COOKIE ESTIVER VAZIO) ---
+        function carregarDadosIniciais() {
+            let colabCookie = getCookie('preserves_colaboradores');
+            let veiculosCookie = getCookie('preserves_veiculos');
+            let manutCookie = getCookie('preserves_manutencoes');
+            let escalaCookie = getCookie('preserves_escala');
+
+            if (!colabCookie || colabCookie.length === 0) {
+                // Colaboradores de simulação
+                const colabsIniciais = [
+                    { id: 101, nome: "Marcos Souza", funcao: "Encarregado" },
+                    { id: 102, nome: "Roberto Alves", funcao: "Encarregado" },
+                    { id: 103, nome: "Julio César", funcao: "Encarregado" },
+                    { id: 104, nome: "Carlos Eduardo", funcao: "Encarregado" },
+                    { id: 201, nome: "Bruno Lima", funcao: "Ajudante" },
+                    { id: 202, nome: "Diego Silva", funcao: "Ajudante" },
+                    { id: 203, nome: "Gabriel Costa", funcao: "Ajudante" },
+                    { id: 204, nome: "Lucas Oliveira", funcao: "Ajudante" },
+                    { id: 205, nome: "Rodrigo Santos", funcao: "Ajudante" },
+                    { id: 206, nome: "Thiago Mello", funcao: "Ajudante" },
+                    { id: 207, nome: "Felipe André", funcao: "Ajudante" },
+                    { id: 208, nome: "Mateus Rocha", funcao: "Ajudante" },
+                    { id: 209, nome: "Alexandre Cruz", funcao: "Ajudante" },
+                    { id: 210, nome: "Vitor Hugo", funcao: "Ajudante" },
+                    { id: 211, nome: "Fábio Junior", funcao: "Ajudante" },
+                    { id: 212, nome: "Jefferson Lima", funcao: "Ajudante" }
+                ];
+                setCookie('preserves_colaboradores', colabsIniciais);
+                colaboradores = colabsIniciais;
+            } else {
+                colaboradores = colabCookie;
+            }
+
+            if (!veiculosCookie || veiculosCookie.length === 0) {
+                // Veículos atribuídos de simulação
+                const veiculosIniciais = [
+                    { id: 301, nome: "Hilux Prata CD", placa: "BRA2E19", encarregado: "Marcos Souza" },
+                    { id: 302, nome: "Hilux Preta 4x4", placa: "QNE4A88", encarregado: "Roberto Alves" },
+                    { id: 303, nome: "Hilux Branca Diesel", placa: "RIO2F22", encarregado: "Julio César" },
+                    { id: 304, nome: "Hilux Vermelha Flex", placa: "PLK9J11", encarregado: "Carlos Eduardo" }
+                ];
+                setCookie('preserves_veiculos', veiculosIniciais);
+                veiculos = veiculosIniciais;
+            } else {
+                veiculos = veiculosCookie;
+            }
+
+            if (!manutCookie || manutCookie.length === 0) {
+                // Manutenções de simulação
+                const manutIniciais = [
+                    { id: 401, veiculoId: 302, nomeVeiculo: "Hilux Preta 4x4", placa: "QNE4A88", motivo: "Troca de óleo e pastilhas de freio", saida: "2026-05-10", retorno: "2026-05-13", status: "Concluído" },
+                    { id: 402, veiculoId: 303, nomeVeiculo: "Hilux Branca Diesel", placa: "RIO2F22", motivo: "Revisão de suspensão e alinhamento", saida: "2026-05-18", retorno: "2026-05-21", status: "Em Manutenção" }
+                ];
+                setCookie('preserves_manutencoes', manutIniciais);
+                manutencoes = manutIniciais;
+            } else {
+                manutencoes = manutCookie;
+            }
+
+            if (!escalaCookie || escalaCookie.length === 0) {
+                escalaMensal = [];
+            } else {
+                escalaMensal = escalaCookie;
+            }
+        }
+
+        // Variáveis globais carregadas de cookies
+        let colaboradores = [];
+        let veiculos = [];
+        let manutencoes = [];
+        let escalaMensal = [];
+
+        carregarDadosIniciais();
+
+        // Inicializa ao carregar a página
+        document.addEventListener("DOMContentLoaded", () => {
+            renderizarColaboradores();
+            atualizarSelectsEncarregados();
+            renderizarVeiculos();
+            atualizarSelectsVeiculosManutencao();
+            renderizarManutencoes();
+            renderizarCronograma();
+            renderizarDashboard();
+
+            // Se a escala estiver vazia por padrão na primeira carga, gera uma simulação para as equipes
+            if (escalaMensal.length === 0) {
+                gerarRodizioSilencioso();
+            }
+        });
+
+        // Alternância de Abas
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-preserves-700', 'text-white');
+                btn.classList.add('text-preserves-200', 'hover:text-white');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            document.getElementById(`btn-${tabId}`).classList.add('bg-preserves-700', 'text-white');
+            document.getElementById(`btn-${tabId}`).classList.remove('text-preserves-200', 'hover:text-white');
+        }
+
+        // Toasts elegantes para substituição do alert()
+        function showToast(message, type = "success") {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.innerText = message;
+            
+            if (type === "success") {
+                toast.className = "fixed top-5 right-5 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-slate-500 bg-white rounded-lg shadow-xl border-l-4 border-green-600 transition-all duration-300 transform translate-y-0 opacity-100";
+                toastIcon.innerHTML = `<i class="fas fa-check-circle text-lg text-green-600"></i>`;
+            } else {
+                toast.className = "fixed top-5 right-5 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-slate-500 bg-white rounded-lg shadow-xl border-l-4 border-rose-600 transition-all duration-300 transform translate-y-0 opacity-100";
+                toastIcon.innerHTML = `<i class="fas fa-exclamation-circle text-lg text-rose-600"></i>`;
+            }
+
+            setTimeout(() => {
+                toast.className = "fixed top-5 right-5 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-slate-500 bg-white rounded-lg shadow-xl border-l-4 border-preserves-600 transition-all duration-300 transform translate-y-[-150%] opacity-0";
+            }, 3000);
+        }
+
+        // Atualiza dinamicamente as caixas de seleção que mostram encarregados
+        function atualizarSelectsEncarregados() {
+            const selectCarros = document.getElementById('veiculo-encarregado');
+            const encarregados = colaboradores.filter(c => c.funcao === 'Encarregado');
+            
+            selectCarros.innerHTML = '';
+            
+            if (encarregados.length === 0) {
+                selectCarros.innerHTML = `<option value="">-- Cadastre um Encarregado Primeiro --</option>`;
+                return;
+            }
+
+            encarregados.forEach(enc => {
+                const opt = document.createElement('option');
+                opt.value = enc.nome;
+                opt.innerText = enc.nome;
+                selectCarros.appendChild(opt);
+            });
+        }
+
+        // Atualiza dinamicamente a caixa de seleção de veículos em manutenção
+        function atualizarSelectsVeiculosManutencao() {
+            const selectManut = document.getElementById('manut-veiculo');
+            
+            selectManut.innerHTML = '';
+            
+            if (veiculos.length === 0) {
+                selectManut.innerHTML = `<option value="">-- Cadastre uma Hilux Primeiro --</option>`;
+                return;
+            }
+
+            veiculos.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v.id;
+                opt.innerText = `${v.nome} (${v.placa})`;
+                selectManut.appendChild(opt);
+            });
+        }
+
+        // Procura se o veículo está ativo ou atualmente em manutenção
+        function checarStatusCarro(veiculoPlaca) {
+            const sobReparo = manutencoes.some(m => m.placa === veiculoPlaca && m.status === 'Em Manutenção');
+            return sobReparo ? "Manutenção" : "Operante";
+        }
+
+        // Procura veículo atrelado ao Encarregado
+        function buscarVeiculoPorEncarregado(nomeEncarregado) {
+            const carro = veiculos.find(v => v.encarregado.trim().toLowerCase() === nomeEncarregado.trim().toLowerCase());
+            if (carro) {
+                const status = checarStatusCarro(carro.placa);
+                const statusBadge = status === "Manutenção" ? " (EM MANUTENÇÃO)" : "";
+                return `${carro.nome} [${carro.placa}]${statusBadge}`;
+            }
+            return "Sem veículo atribuído";
+        }
+
+
+        // ================= SEÇÃO: COLABORADORES =================
+
+        function salvarColaborador(event) {
+            event.preventDefault();
+            const nomeInput = document.getElementById('colab-nome');
+            const funcaoSelect = document.getElementById('colab-funcao');
+
+            const novoColab = {
+                id: Date.now(),
+                nome: nomeInput.value.trim(),
+                funcao: funcaoSelect.value
+            };
+
+            colaboradores.push(novoColab);
+            setCookie('preserves_colaboradores', colaboradores);
+
+            nomeInput.value = '';
+            showToast("Colaborador salvo com sucesso!");
+            renderizarColaboradores();
+            atualizarSelectsEncarregados();
+            renderizarDashboard();
+        }
+
+        function deletarColaborador(id) {
+            colaboradores = colaboradores.filter(colab => colab.id !== id);
+            setCookie('preserves_colaboradores', colaboradores);
+            showToast("Colaborador removido!");
+            renderizarColaboradores();
+            atualizarSelectsEncarregados();
+            renderizarDashboard();
+        }
+
+        // Modal de Edição de Colaborador
+        function abrirEditarColaborador(id) {
+            const colab = colaboradores.find(c => c.id === id);
+            if (!colab) return;
+
+            document.getElementById('edit-colab-id').value = colab.id;
+            document.getElementById('edit-colab-nome').value = colab.nome;
+            document.getElementById('edit-colab-funcao').value = colab.funcao;
+            document.getElementById('modal-edit-colab').classList.remove('hidden');
+        }
+
+        function fecharModalColab() {
+            document.getElementById('modal-edit-colab').classList.add('hidden');
+        }
+
+        function salvarEdicaoColaborador() {
+            const id = parseInt(document.getElementById('edit-colab-id').value);
+            const nome = document.getElementById('edit-colab-nome').value.trim();
+            const funcao = document.getElementById('edit-colab-funcao').value;
+
+            if (!nome) {
+                showToast("O nome não pode ficar em branco.", "error");
+                return;
+            }
+
+            colaboradores = colaboradores.map(c => c.id === id ? { ...c, nome, funcao } : c);
+            setCookie('preserves_colaboradores', colaboradores);
+
+            fecharModalColab();
+            showToast("Cadastro de colaborador editado!");
+            renderizarColaboradores();
+            atualizarSelectsEncarregados();
+            renderizarDashboard();
+        }
+
+        function renderizarColaboradores() {
+            const listContainer = document.getElementById('lista-colaboradores');
+            listContainer.innerHTML = '';
+
+            if (colaboradores.length === 0) {
+                listContainer.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="p-8 text-center text-slate-400 text-sm">Nenhum funcionário cadastrado no sistema.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            colaboradores.forEach(colab => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 text-slate-700 transition-colors";
+                
+                const badgeColor = colab.funcao === 'Encarregado' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100';
+
+                tr.innerHTML = `
+                    <td class="p-4 font-semibold text-sm">${colab.nome}</td>
+                    <td class="p-4">
+                        <span class="px-2.5 py-1 text-xs font-bold rounded-full border ${badgeColor}">${colab.funcao}</span>
+                    </td>
+                    <td class="p-4 text-center flex justify-center space-x-1">
+                        <button onclick="abrirEditarColaborador(${colab.id})" class="text-blue-500 hover:text-blue-700 w-8 h-8 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center">
+                            <i class="far fa-edit"></i>
+                        </button>
+                        <button onclick="deletarColaborador(${colab.id})" class="text-rose-500 hover:text-rose-700 w-8 h-8 rounded-lg hover:bg-rose-50 transition-colors flex items-center justify-center">
+                            <i class="far fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                listContainer.appendChild(tr);
+            });
+        }
+
+
+        // ================= SEÇÃO: CADASTRO DE VEÍCULOS (HILUX OPERANTE) =================
+
+        function salvarVeiculo(event) {
+            event.preventDefault();
+            const nomeInput = document.getElementById('veiculo-nome');
+            const placaInput = document.getElementById('veiculo-placa');
+            const encSelect = document.getElementById('veiculo-encarregado');
+
+            if (!encSelect.value) {
+                showToast("Por favor, registre primeiro um Encarregado para associar à Hilux.", "error");
+                return;
+            }
+
+            const novoVeiculo = {
+                id: Date.now(),
+                nome: nomeInput.value.trim(),
+                placa: placaInput.value.trim().toUpperCase(),
+                encarregado: encSelect.value
+            };
+
+            veiculos.push(novoVeiculo);
+            setCookie('preserves_veiculos', veiculos);
+
+            nomeInput.value = '';
+            placaInput.value = '';
+
+            showToast("Hilux cadastrada com sucesso!");
+            renderizarVeiculos();
+            atualizarSelectsVeiculosManutencao();
+            renderizarDashboard();
+        }
+
+        function deletarVeiculo(id) {
+            veiculos = veiculos.filter(v => v.id !== id);
+            setCookie('preserves_veiculos', veiculos);
+            showToast("Veículo removido da frota!");
+            renderizarVeiculos();
+            atualizarSelectsVeiculosManutencao();
+            renderizarDashboard();
+        }
+
+        // Modal de Edição de Veículo
+        function abrirEditarVeiculo(id) {
+            const v = veiculos.find(car => car.id === id);
+            if (!v) return;
+
+            document.getElementById('edit-veiculo-id').value = v.id;
+            document.getElementById('edit-veiculo-nome').value = v.nome;
+            document.getElementById('edit-veiculo-placa').value = v.placa;
+
+            const editSelect = document.getElementById('edit-veiculo-encarregado');
+            editSelect.innerHTML = '';
+            const encarregados = colaboradores.filter(c => c.funcao === 'Encarregado');
+            encarregados.forEach(enc => {
+                const opt = document.createElement('option');
+                opt.value = enc.nome;
+                opt.innerText = enc.nome;
+                if (enc.nome === v.encarregado) opt.selected = true;
+                editSelect.appendChild(opt);
+            });
+
+            document.getElementById('modal-edit-veiculo').classList.remove('hidden');
+        }
+
+        function fecharModalVeiculo() {
+            document.getElementById('modal-edit-veiculo').classList.add('hidden');
+        }
+
+        function salvarEdicaoVeiculo() {
+            const id = parseInt(document.getElementById('edit-veiculo-id').value);
+            const nome = document.getElementById('edit-veiculo-nome').value.trim();
+            const placa = document.getElementById('edit-veiculo-placa').value.trim().toUpperCase();
+            const encarregado = document.getElementById('edit-veiculo-encarregado').value;
+
+            if (!nome || !placa) {
+                showToast("Identificação e placa são obrigatórias.", "error");
+                return;
+            }
+
+            veiculos = veiculos.map(v => v.id === id ? { ...v, nome, placa, encarregado } : v);
+            setCookie('preserves_veiculos', veiculos);
+
+            fecharModalVeiculo();
+            showToast("Cadastro de veículo atualizado!");
+            renderizarVeiculos();
+            atualizarSelectsVeiculosManutencao();
+            renderizarDashboard();
+        }
+
+        function renderizarVeiculos() {
+            const listContainer = document.getElementById('lista-veiculos');
+            listContainer.innerHTML = '';
+
+            if (veiculos.length === 0) {
+                listContainer.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="p-8 text-center text-slate-400 text-sm">Nenhum veículo Hilux registrado.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            veiculos.forEach(v => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 text-slate-700 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-4 text-sm font-semibold text-slate-800">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-truck-pickup text-slate-400"></i>
+                            <span>${v.nome}</span>
+                        </div>
+                    </td>
+                    <td class="p-4 text-sm font-mono text-slate-600">${v.placa}</td>
+                    <td class="p-4 text-sm font-semibold text-emerald-800">${v.encarregado}</td>
+                    <td class="p-4 text-center flex justify-center space-x-1">
+                        <button onclick="abrirEditarVeiculo(${v.id})" class="text-blue-500 hover:text-blue-700 w-8 h-8 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center">
+                            <i class="far fa-edit"></i>
+                        </button>
+                        <button onclick="deletarVeiculo(${v.id})" class="text-rose-500 hover:text-rose-700 w-8 h-8 rounded-lg hover:bg-rose-50 transition-colors flex items-center justify-center">
+                            <i class="far fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                listContainer.appendChild(tr);
+            });
+        }
+
+
+        // ================= SEÇÃO: ABA DE MANUTENÇÃO DE CARROS (SEPARADA) =================
+
+        function salvarManutencao(event) {
+            event.preventDefault();
+            const veiculoSelect = document.getElementById('manut-veiculo');
+            const motivoInput = document.getElementById('manut-motivo');
+            const saidaInput = document.getElementById('manut-saida');
+            const retornoInput = document.getElementById('manut-retorno');
+
+            if (!veiculoSelect.value) {
+                showToast("Por favor, registre primeiro um veículo para enviar para manutenção.", "error");
+                return;
+            }
+
+            const veiculoId = parseInt(veiculoSelect.value);
+            const carroEncontrado = veiculos.find(v => v.id === veiculoId);
+
+            const novaManut = {
+                id: Date.now(),
+                veiculoId: veiculoId,
+                nomeVeiculo: carroEncontrado.nome,
+                placa: carroEncontrado.placa,
+                motivo: motivoInput.value.trim(),
+                saida: saidaInput.value,
+                retorno: retornoInput.value,
+                status: "Em Manutenção"
+            };
+
+            manutencoes.push(novaManut);
+            setCookie('preserves_manutencoes', manutencoes);
+
+            motivoInput.value = '';
+            saidaInput.value = '';
+            retornoInput.value = '';
+
+            showToast("Veículo enviado para a manutenção!");
+            renderizarManutencoes();
+            renderizarDashboard();
+        }
+
+        function deletarManutencao(id) {
+            manutencoes = manutencoes.filter(m => m.id !== id);
+            setCookie('preserves_manutencoes', manutencoes);
+            showToast("Manutenção removida do histórico!");
+            renderizarManutencoes();
+            renderizarDashboard();
+        }
+
+        // Modal de Edição de Manutenção
+        function abrirEditarManutencao(id) {
+            const m = manutencoes.find(item => item.id === id);
+            if (!m) return;
+
+            document.getElementById('edit-manut-id').value = m.id;
+            document.getElementById('edit-manut-motivo').value = m.motivo;
+            document.getElementById('edit-manut-saida').value = m.saida;
+            document.getElementById('edit-manut-retorno').value = m.retorno;
+            document.getElementById('edit-manut-status').value = m.status;
+
+            const editSelect = document.getElementById('edit-manut-veiculo');
+            editSelect.innerHTML = '';
+            veiculos.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v.id;
+                opt.innerText = `${v.nome} (${v.placa})`;
+                if (v.id === m.veiculoId) opt.selected = true;
+                editSelect.appendChild(opt);
+            });
+
+            document.getElementById('modal-edit-manutencao').classList.remove('hidden');
+        }
+
+        function fecharModalManutencao() {
+            document.getElementById('modal-edit-manutencao').classList.add('hidden');
+        }
+
+        function salvarEdicaoManutencao() {
+            const id = parseInt(document.getElementById('edit-manut-id').value);
+            const veiculoId = parseInt(document.getElementById('edit-manut-veiculo').value);
+            const motivo = document.getElementById('edit-manut-motivo').value.trim();
+            const saida = document.getElementById('edit-manut-saida').value;
+            const retorno = document.getElementById('edit-manut-retorno').value;
+            const status = document.getElementById('edit-manut-status').value;
+
+            const carroEncontrado = veiculos.find(v => v.id === veiculoId);
+
+            if (!motivo) {
+                showToast("O motivo é obrigatório.", "error");
+                return;
+            }
+
+            manutencoes = manutencoes.map(m => m.id === id ? {
+                ...m,
+                veiculoId,
+                nomeVeiculo: carroEncontrado.nome,
+                placa: carroEncontrado.placa,
+                motivo,
+                saida,
+                retorno,
+                status
+            } : m);
+
+            setCookie('preserves_manutencoes', manutencoes);
+
+            fecharModalManutencao();
+            showToast("Registro de manutenção atualizado!");
+            renderizarManutencoes();
+            renderizarDashboard();
+        }
+
+        function renderizarManutencoes() {
+            const listContainer = document.getElementById('lista-manutencao');
+            listContainer.innerHTML = '';
+
+            if (manutencoes.length === 0) {
+                listContainer.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="p-8 text-center text-slate-400 text-sm">Sem veículos atualmente em manutenção.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            manutencoes.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 text-slate-700 transition-colors";
+                
+                const statusBadge = m.status === 'Em Manutenção' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800';
+
+                tr.innerHTML = `
+                    <td class="p-4 text-sm font-semibold text-slate-800">
+                        <div class="flex flex-col">
+                            <span class="font-bold text-slate-800">${m.nomeVeiculo}</span>
+                            <span class="text-xs text-slate-400 font-mono">${m.placa}</span>
+                        </div>
+                    </td>
+                    <td class="p-4 text-sm text-slate-600 max-w-[200px] truncate">${m.motivo}</td>
+                    <td class="p-4 text-sm">
+                        <div class="flex flex-col text-xs text-slate-500">
+                            <span><strong class="text-slate-700">Saída:</strong> ${formatarData(m.saida)}</span>
+                            <span><strong class="text-slate-700">Retorno:</strong> ${formatarData(m.retorno)}</span>
+                        </div>
+                    </td>
+                    <td class="p-4 text-sm">
+                        <span class="px-2 py-0.5 rounded text-xs font-bold ${statusBadge}">${m.status}</span>
+                    </td>
+                    <td class="p-4 text-center flex justify-center space-x-1 mt-1">
+                        <button onclick="abrirEditarManutencao(${m.id})" class="text-blue-500 hover:text-blue-700 w-8 h-8 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center">
+                            <i class="far fa-edit"></i>
+                        </button>
+                        <button onclick="deletarManutencao(${m.id})" class="text-rose-500 hover:text-rose-700 w-8 h-8 rounded-lg hover:bg-rose-50 transition-colors flex items-center justify-center">
+                            <i class="far fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                listContainer.appendChild(tr);
+            });
+        }
+
+        // Helper para formatar data de AAAA-MM-DD para DD/MM/AAAA
+        function formatarData(dataOriginal) {
+            if (!dataOriginal) return 'Não Definido';
+            const partes = dataOriginal.split('-');
+            if (partes.length === 3) {
+                return `${partes[2]}/${partes[1]}/${partes[0]}`;
+            }
+            return dataOriginal;
+        }
+
+
+        // ================= SEÇÃO: RODÍZIO AUTOMÁTICO (3 EM 3 DIAS COM VÍNCULO DE VEÍCULO) =================
+
+        function gerarRodizioSilencioso() {
+            const encarregados = colaboradores.filter(c => c.funcao === 'Encarregado');
+            const ajudantes = colaboradores.filter(c => c.funcao === 'Ajudante');
+            if (encarregados.length === 0 || ajudantes.length < 3) return;
+
+            escalaMensal = [];
+            let indexGeralAjudantes = 0;
+            const intervaloDias = 3;
+            const totalDiasMes = 30;
+
+            for (let dia = 1; dia <= totalDiasMes; dia += intervaloDias) {
+                const diaInicio = dia;
+                const diaFim = Math.min(dia + intervaloDias - 1, totalDiasMes);
+                const periodoString = `Dia ${diaInicio} ao Dia ${diaFim}`;
+
+                const equipesDoBloco = [];
+
+                encarregados.forEach((encarregado, encIndex) => {
+                    const ajudantesDaEquipe = [];
+
+                    for (let a = 0; a < 3; a++) {
+                        const ajudanteAtual = ajudantes[indexGeralAjudantes % ajudantes.length];
+                        ajudantesDaEquipe.push(ajudanteAtual ? ajudanteAtual.nome : "Não Alocado");
+                        indexGeralAjudantes++;
+                    }
+
+                    const veiculoAssociado = buscarVeiculoPorEncarregado(encarregado.nome);
+
+                    equipesDoBloco.push({
+                        equipeNumero: encIndex + 1,
+                        encarregado: encarregado.nome,
+                        veiculo: veiculoAssociado,
+                        ajudantes: ajudantesDaEquipe
+                    });
+                });
+
+                escalaMensal.push({
+                    periodo: periodoString,
+                    equipes: equipesDoBloco
+                });
+            }
+
+            setCookie('preserves_escala', escalaMensal);
+        }
+
+        function gerarRodizio() {
+            const encarregados = colaboradores.filter(c => c.funcao === 'Encarregado');
+            const ajudantes = colaboradores.filter(c => c.funcao === 'Ajudante');
+            const qtdAjudantesPorEquipe = parseInt(document.getElementById('rodizio-num-ajudantes').value);
+
+            if (encarregados.length === 0) {
+                showToast("É necessário cadastrar ao menos 1 Encarregado para gerar equipes.", "error");
+                return;
+            }
+
+            if (ajudantes.length < qtdAjudantesPorEquipe) {
+                showToast(`Quantidade insuficiente de ajudantes. Cadastre pelo menos ${qtdAjudantesPorEquipe}.`, "error");
+                return;
+            }
+
+            escalaMensal = [];
+            let indexGeralAjudantes = 0;
+
+            const intervaloDias = 3;
+            const totalDiasMes = 30;
+
+            for (let dia = 1; dia <= totalDiasMes; dia += intervaloDias) {
+                const diaInicio = dia;
+                const diaFim = Math.min(dia + intervaloDias - 1, totalDiasMes);
+                const periodoString = `Dia ${diaInicio} ao Dia ${diaFim}`;
+
+                const equipesDoBloco = [];
+
+                encarregados.forEach((encarregado, encIndex) => {
+                    const ajudantesDaEquipe = [];
+
+                    for (let a = 0; a < qtdAjudantesPorEquipe; a++) {
+                        const ajudanteAtual = ajudantes[indexGeralAjudantes % ajudantes.length];
+                        ajudantesDaEquipe.push(ajudanteAtual ? ajudanteAtual.nome : "Não Alocado");
+                        indexGeralAjudantes++;
+                    }
+
+                    const veiculoAssociado = buscarVeiculoPorEncarregado(encarregado.nome);
+
+                    equipesDoBloco.push({
+                        equipeNumero: encIndex + 1,
+                        encarregado: encarregado.nome,
+                        veiculo: veiculoAssociado,
+                        ajudantes: ajudantesDaEquipe
+                    });
+                });
+
+                escalaMensal.push({
+                    periodo: periodoString,
+                    equipes: equipesDoBloco
+                });
+            }
+
+            setCookie('preserves_escala', escalaMensal);
+            renderizarCronograma();
+            renderizarDashboard();
+            showToast("Novo Rodízio de 30 dias gerado!");
+        }
+
+        function renderizarCronograma() {
+            const container = document.getElementById('cronograma-container');
+            container.innerHTML = '';
+
+            if (escalaMensal.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-calendar-alt text-2xl"></i>
+                        </div>
+                        <h4 class="font-bold text-slate-700">Sem Rodízio Ativo</h4>
+                        <p class="text-sm text-slate-400 max-w-sm mx-auto mt-1">Gere um novo rodízio clicando no botão acima para montar o cronograma.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            escalaMensal.forEach((bloco) => {
+                const cardBloco = document.createElement('div');
+                cardBloco.className = "p-5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-4";
+                
+                cardBloco.innerHTML = `
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 pb-3 gap-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 bg-preserves-600 rounded-full animate-pulse"></span>
+                            <h4 class="font-bold text-slate-800 text-sm">Fase do Período: <span class="text-preserves-700 font-mono">${bloco.periodo}</span></h4>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${bloco.equipes.map(eq => {
+                            const emManutencao = eq.veiculo.includes("(EM MANUTENÇÃO)");
+                            const veiculoTextoOriginal = eq.veiculo.replace(" (EM MANUTENÇÃO)", "");
+                            const temVeiculo = eq.veiculo !== "Sem veículo atribuído";
+                            
+                            let veiculoBadge = '';
+                            if (temVeiculo) {
+                                veiculoBadge = emManutencao 
+                                    ? `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-bold">Oficina / Manut.</span>` 
+                                    : `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">Operante</span>`;
+                            } else {
+                                veiculoBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-800 font-bold">Sem Carro</span>`;
+                            }
+
+                            return `
+                            <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                                <div class="space-y-2.5">
+                                    <div class="flex items-center justify-between text-xs font-bold">
+                                        <span class="text-preserves-800"><i class="fas fa-id-badge mr-1"></i> Equipe ${eq.equipeNumero}</span>
+                                        ${veiculoBadge}
+                                    </div>
+                                    
+                                    <div class="border-t border-slate-50 pt-2">
+                                        <div class="text-[10px] text-slate-400 font-bold">ENCARREGADO</div>
+                                        <div class="font-semibold text-slate-800 text-sm pl-2 border-l-2 border-preserves-500">${eq.encarregado}</div>
+                                    </div>
+
+                                    <div>
+                                        <div class="text-[10px] text-slate-400 font-bold">VEÍCULO DA EQUIPE</div>
+                                        <div class="text-xs text-slate-700 pl-2 font-mono flex items-center gap-1.5 mt-0.5">
+                                            <i class="fas fa-car ${emManutencao ? 'text-rose-400' : 'text-slate-300'}"></i> 
+                                            <span class="${emManutencao ? 'text-rose-600 font-semibold line-through' : ''}">${veiculoTextoOriginal}</span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="text-[10px] text-slate-400 font-bold">AJUDANTES DO PERÍODO</div>
+                                        <div class="flex flex-col space-y-1 pl-2 mt-1">
+                                            ${eq.ajudantes.map(aj => `
+                                                <div class="text-xs text-slate-600 flex items-center space-x-1">
+                                                    <i class="fas fa-angle-right text-slate-300"></i>
+                                                    <span>${aj}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+                container.appendChild(cardBloco);
+            });
+        }
+
+
+        // ================= OPERAÇÕES: DASHBOARD DE EQUIPES COMPLETA =================
+
+        function renderizarDashboard() {
+            const encarregadosCount = colaboradores.filter(c => c.funcao === 'Encarregado').length;
+            const ajudantesCount = colaboradores.filter(c => c.funcao === 'Ajudante').length;
+            const manutCount = manutencoes.filter(m => m.status === 'Em Manutenção').length;
+
+            document.getElementById('dash-tot-encarregados').innerText = encarregadosCount;
+            document.getElementById('dash-tot-ajudantes').innerText = ajudantesCount;
+            document.getElementById('dash-tot-veiculos').innerText = veiculos.length;
+            document.getElementById('dash-tot-manutencao').innerText = manutCount;
+
+            const cardsContainer = document.getElementById('dashboard-equipes-cards');
+            cardsContainer.innerHTML = '';
+
+            if (escalaMensal.length === 0) {
+                cardsContainer.innerHTML = `
+                    <div class="col-span-full p-8 text-center border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">
+                        Nenhuma escala gerada na base de dados. Acesse a aba "Girar Rodízio" no menu para gerar a escala inicial.
+                    </div>
+                `;
+                return;
+            }
+
+            // Exibe a primeira escala (Dia 1 ao Dia 3) como estado atual da Dashboard das Equipes
+            const primeiraEscala = escalaMensal[0];
+
+            primeiraEscala.equipes.forEach(eq => {
+                const emManutencao = eq.veiculo.includes("(EM MANUTENÇÃO)");
+                const veiculoOriginal = eq.veiculo.replace(" (EM MANUTENÇÃO)", "");
+                const temVeiculo = eq.veiculo !== "Sem veículo atribuído";
+
+                let statusBadge = '';
+                let statusCardBorder = 'border-slate-100';
+                
+                if (temVeiculo) {
+                    if (emManutencao) {
+                        statusBadge = `<span class="px-2.5 py-1 text-[10px] font-extrabold bg-rose-100 text-rose-800 rounded-full border border-rose-200"><i class="fas fa-exclamation-triangle mr-1"></i> VEÍCULO NA OFICINA</span>`;
+                        statusCardBorder = 'border-l-4 border-l-rose-500 border-slate-100';
+                    } else {
+                        statusBadge = `<span class="px-2.5 py-1 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200"><i class="fas fa-check-circle mr-1"></i> OPERAÇÃO NORMAL</span>`;
+                        statusCardBorder = 'border-l-4 border-l-emerald-500 border-slate-100';
+                    }
+                } else {
+                    statusBadge = `<span class="px-2.5 py-1 text-[10px] font-extrabold bg-amber-100 text-amber-800 rounded-full border border-amber-200"><i class="fas fa-exclamation-circle mr-1"></i> SEM CARRO DESIGNADO</span>`;
+                    statusCardBorder = 'border-l-4 border-l-amber-500 border-slate-100';
+                }
+
+                const card = document.createElement('div');
+                card.className = `bg-white p-5 rounded-2xl shadow-sm border ${statusCardBorder} flex flex-col justify-between space-y-4 transition-all hover:shadow-md`;
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-preserves-50 text-preserves-800 border border-preserves-100 rounded-xl flex items-center justify-center font-bold text-xs shadow-sm">
+                                E${eq.equipeNumero}
+                            </div>
+                            <div>
+                                <h4 class="font-extrabold text-slate-800 text-sm">${eq.encarregado}</h4>
+                                <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Líder de Equipe</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Veículo do Líder</div>
+                        <div class="text-xs text-slate-700 font-mono flex items-center justify-between">
+                            <span class="flex items-center gap-1.5 font-bold ${emManutencao ? 'text-slate-400 line-through' : 'text-slate-800'}">
+                                <i class="fas fa-truck-pickup text-slate-400"></i> ${veiculoOriginal}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ajudantes Atuais (Rotação 3 Dias)</div>
+                        <div class="flex flex-col space-y-1">
+                            ${eq.ajudantes.map(aj => `
+                                <div class="text-xs text-slate-700 bg-white border border-slate-150 p-2 rounded-lg font-semibold flex items-center space-x-2">
+                                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                                    <span>${aj}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-100 pt-3 flex items-center justify-between">
+                        ${statusBadge}
+                        <span class="text-[10px] text-slate-400 font-bold font-mono">Fase 1 (Dia 1-3)</span>
+                    </div>
+                `;
+                cardsContainer.appendChild(card);
+            });
+        }
+
+
+        // ================= GERAÇÃO DE PDFS SEPARADOS (PROFISSIONAL) =================
+
+        // Helper de cabeçalho corporativo do PDF
+        function desenharCabecalhoRelatorio(doc, titulo) {
+            // Faixa de cabeçalho verde floresta corporativa
+            doc.setFillColor(20, 83, 45); // Verde Preserves 900
+            doc.rect(0, 0, 210, 35, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.text("PRESERVES EQUIPE", 15, 18);
+            
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.text("SISTEMA DE GESTÃO - RELATÓRIOS INDEPENDENTES DE OPERAÇÃO", 15, 26);
+            
+            const dataHoje = new Date().toLocaleDateString('pt-BR');
+            doc.text(`Emissão: ${dataHoje}`, 160, 26);
+
+            // Subtítulo do relatório
+            doc.setTextColor(30, 41, 59); // Slate 800
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(13);
+            doc.text(titulo.toUpperCase(), 15, 48);
+            
+            // Separador
+            doc.setDrawColor(226, 232, 240); // Slate 200
+            doc.line(15, 52, 195, 52);
+        }
+
+        // PDF SEPARADO 1: RELATÓRIO DE EQUIPES COM SEUS VEÍCULOS E ESCALA COMPLETA DO MÊS
+        function gerarPdfEquipesComVeiculos() {
+            if (escalaMensal.length === 0) {
+                showToast("Não há lançamentos de escala de rodízio na base para exportar.", "error");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            let pagina = 1;
+
+            desenharCabecalhoRelatorio(doc, "RELATÓRIO MENSAL - EQUIPES COM VEÍCULOS E RODÍZIO");
+
+            let y = 62;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(100, 116, 139);
+            doc.text("Abaixo consta a escala contendo os Encarregados, seus respectivos veículos e a escala de ajudantes a cada 3 dias.", 15, y);
+            y += 12;
+
+            escalaMensal.forEach((bloco) => {
+                if (y > 245) {
+                    doc.addPage();
+                    pagina++;
+                    desenharCabecalhoRelatorio(doc, "RELATÓRIO MENSAL - EQUIPES COM VEÍCULOS E RODÍZIO");
+                    y = 62;
+                }
+
+                // Caixa de Período do Bloco
+                doc.setFillColor(248, 250, 252);
+                doc.setDrawColor(203, 213, 225);
+                doc.roundedRect(15, y, 180, 8, 1, 1, 'FD');
+                
+                doc.setTextColor(21, 128, 61);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(10);
+                doc.text(`PERÍODO: ${bloco.periodo.toUpperCase()}`, 19, y + 5.5);
+                y += 13;
+
+                bloco.equipes.forEach(eq => {
+                    if (y > 270) {
+                        doc.addPage();
+                        pagina++;
+                        desenharCabecalhoRelatorio(doc, "RELATÓRIO MENSAL - EQUIPES COM VEÍCULOS E RODÍZIO");
+                        y = 62;
+                    }
+
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(9);
+                    doc.setTextColor(51, 65, 85);
+                    doc.text(`Equipe 0${eq.equipeNumero}`, 18, y);
+                    
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(8.5);
+                    doc.text(`Encarregado: ${eq.encarregado}`, 40, y);
+                    
+                    const veiculoLimpo = eq.veiculo.replace(" (EM MANUTENÇÃO)", "");
+                    doc.text(`Veículo: ${veiculoLimpo}`, 95, y);
+                    doc.text(`Ajudantes: ${eq.ajudantes.join(', ')}`, 142, y);
+                    
+                    doc.setDrawColor(241, 245, 249);
+                    doc.line(15, y + 3.5, 195, y + 3.5);
+                    y += 9;
+                });
+
+                y += 3;
+            });
+
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text(`Preserves Equipe - Página ${pagina}`, 15, 287);
+
+            doc.save("Preserves_Escala_Equipes_Veiculos.pdf");
+            showToast("PDF de Escalas de Equipe baixado!");
+        }
+
+        // PDF SEPARADO 2: RELATÓRIO DO INVENTÁRIO DE MANUTENÇÃO DE FROTA HILUX
+        function gerarPdfManutencoes() {
+            if (manutencoes.length === 0) {
+                showToast("Não existem registros de manutenção cadastrados para exportar.", "error");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            let pagina = 1;
+
+            desenharCabecalhoRelatorio(doc, "RELATÓRIO OPERACIONAL - MANUTENÇÃO DE FROTA HILUX");
+
+            let y = 62;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(100, 116, 139);
+            doc.text("Histórico e registros das Hilux que foram enviadas para reparos mecânicos ou revisões periódicas.", 15, y);
+            y += 12;
+
+            // Cabeçalho da Tabela
+            doc.setFillColor(241, 245, 249);
+            doc.rect(15, y, 180, 8, 'F');
+            
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(51, 65, 85);
+            doc.text("CARRO / PLACA", 18, y + 5.5);
+            doc.text("PROBLEMA / MOTIVO", 65, y + 5.5);
+            doc.text("DATAS (SAÍDA/RETORNO)", 125, y + 5.5);
+            doc.text("STATUS", 172, y + 5.5);
+            
+            y += 8;
+
+            doc.setFont("helvetica", "normal");
+            manutencoes.forEach((m) => {
+                if (y > 270) {
+                    doc.addPage();
+                    pagina++;
+                    desenharCabecalhoRelatorio(doc, "RELATÓRIO OPERACIONAL - MANUTENÇÃO DE FROTA HILUX");
+                    y = 62;
+                    
+                    // Repete Cabeçalho na nova página
+                    doc.setFillColor(241, 245, 249);
+                    doc.rect(15, y, 180, 8, 'F');
+                    doc.setFont("helvetica", "bold");
+                    doc.text("CARRO / PLACA", 18, y + 5.5);
+                    doc.text("PROBLEMA / MOTIVO", 65, y + 5.5);
+                    doc.text("DATAS (SAÍDA/RETORNO)", 125, y + 5.5);
+                    doc.text("STATUS", 172, y + 5.5);
+                    doc.setFont("helvetica", "normal");
+                    y += 8;
+                }
+
+                doc.setFont("helvetica", "bold");
+                doc.text(m.nomeVeiculo, 18, y + 5);
+                doc.setFont("helvetica", "normal");
+                doc.text(m.placa, 18, y + 9);
+
+                doc.text(m.motivo, 65, y + 5);
+                doc.text(`Saída: ${formatarData(m.saida)}`, 125, y + 5);
+                doc.text(`Retorno: ${formatarData(m.retorno)}`, 125, y + 9);
+                doc.text(m.status, 172, y + 5);
+                
+                doc.setDrawColor(241, 245, 249);
+                doc.line(15, y + 11, 195, y + 11);
+                y += 13;
+            });
+
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text(`Preserves Equipe - Página ${pagina}`, 15, 287);
+
+            doc.save("Preserves_Historico_Manutencoes.pdf");
+            showToast("PDF de Manutencao de Frotas baixado!");
+        }
+    </script>
 </body>
 </html>
+
+```
